@@ -10,7 +10,8 @@ np.random.seed(1337)  # for reproducibility
 import random
 from keras.datasets import mnist
 from keras.models import Sequential, Model
-from keras.layers import Dense, Dropout, Input, Lambda, Convolution2D, MaxPooling2D, Flatten, merge, ZeroPadding2D,  Activation
+from keras.layers import Dense, Dropout, Input, Lambda, Conv2D, MaxPooling2D, Flatten, ZeroPadding2D,  Activation, Reshape
+from keras.layers.merge import Concatenate
 from keras.optimizers import SGD, RMSprop, Adam
 from keras import backend as K
 from sklearn.metrics import roc_curve, auc
@@ -100,7 +101,7 @@ def create_base_network(input_dim):
     '''
     seq = Sequential()
     
-    seq.add(Convolution2D(32, 3, 3,
+    seq.add(Conv2D(32, (3, 3),
                  activation='relu',
                  input_shape=input_dim, name="firstConv"))
     seq.add(Dropout(0.25, name="firstDrop"))
@@ -177,13 +178,21 @@ input_b = Input(shape=input_dim)
 processed_a = base_network(input_a)
 processed_b = base_network(input_b)
 
-
-
+print(base_network.output_shape)
 #distance = Lambda(euclidean_distance, output_shape=eucl_dist_output_shape)([out_a, out_b])
 
 #borrowed this merge part from https://keras.io/getting-started/functional-api-guide/#shared-layers
-concatenated = merge([processed_a, processed_b], mode='concat')
-compared = Dense(128, init='normal', activation='relu')(concatenated)
+concatenated = Concatenate()([processed_a, processed_b])
+
+temp_model = Model(input=[input_a, input_b], output=concatenated)
+adam = Adam(lr=0.0001)
+temp_model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['accuracy'])
+print("conc")
+print(temp_model.output_shape)
+print("resa")
+reshaped = Reshape((2,128))(concatenated)
+print(reshaped.output_shape)
+compared = Conv2D(128, (1, 128), activation='relu')(reshaped)
 predictions = Dense(1, init='normal', activation='sigmoid')(compared)
 
 model = Model(input=[input_a, input_b], output=predictions)
